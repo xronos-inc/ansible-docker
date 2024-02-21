@@ -49,7 +49,8 @@ RUN pip3 install --no-warn-script-location --upgrade \
     docker \
     ansible \
     boto3 \
-    github3.py
+    github3.py \
+    passlib
 
 ###################
 # application stage
