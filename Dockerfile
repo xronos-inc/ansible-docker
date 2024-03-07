@@ -38,7 +38,8 @@ RUN apt-get install --no-install-recommends -y -q \
     git \
     python3 \
     python3-pip \
-    ssh
+    ssh \
+    rsync
 RUN apt-get autoremove -y -q
 RUN apt-get clean -y -q
 RUN rm -rf /var/lib/apt/lists/*
@@ -50,7 +51,7 @@ RUN pip3 install --no-warn-script-location --upgrade \
     ansible \
     boto3 \
     github3.py \
-    passlib
+    passlib 
 
 ###################
 # application stage
