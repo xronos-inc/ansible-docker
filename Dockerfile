@@ -36,6 +36,7 @@ RUN apt-get install --no-install-recommends -y -q apt-utils 2>&1 \
 	| grep -v "debconf: delaying package configuration"
 RUN apt-get install --no-install-recommends -y -q \
     git \
+    git-lfs \
     python3 \
     python3-pip \
     ssh \
