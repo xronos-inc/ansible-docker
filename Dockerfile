@@ -60,6 +60,9 @@ RUN pip3 install --no-warn-script-location --upgrade \
 FROM base-${TARGETARCH} as app
 COPY --from=base / /
 
+# copy ansible configuration
+COPY ansible.cfg /etc/ansible/ansible.cfg
+
 # configure SSH
 COPY ssh.config /root/.ssh/config
 RUN chmod 0600 /root/.ssh/config
