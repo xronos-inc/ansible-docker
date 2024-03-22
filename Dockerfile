@@ -40,6 +40,7 @@ RUN apt-get install --no-install-recommends -y -q \
     python3 \
     python3-pip \
     ssh \
+    sshpass \
     rsync
 RUN apt-get autoremove -y -q
 RUN apt-get clean -y -q
