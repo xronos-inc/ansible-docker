@@ -54,6 +54,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN pip3 install --no-warn-script-location --upgrade \
     docker \
     ansible \
+    botocore \
     boto3 \
     github3.py \
     passlib 
