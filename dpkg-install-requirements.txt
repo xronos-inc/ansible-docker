@@ -1,0 +1,5 @@
+dpkg-dev=1.22.6ubuntu6.1
+python3.12=3.12.3-1ubuntu0.4
+python3-pip=24.0+dfsg-1ubuntu1.1
+python3-venv=3.12.3-0ubuntu2
+python3-dev=3.12.3-0ubuntu2
