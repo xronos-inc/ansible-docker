@@ -1,0 +1,183 @@
+# SPDX-FileCopyrightText: (c) 2024 Xronos Inc.
+# SPDX-License-Identifier: BSD-3-Clause
+
+# syntax=docker/dockerfile:1
+
+# image from which all other stages derive
+ARG BASEIMAGE=ubuntu:noble-20241118.1
+ARG BUILDKIT_SBOM_SCAN_CONTEXT=true
+
+##################
+## dependencies stage
+##################
+FROM ${BASEIMAGE} AS dependencies
+ARG BUILDKIT_SBOM_SCAN_STAGE=false
+
+ARG CONTAINER_USER=ubuntu
+ARG CONTAINER_USER_UID=1000
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=localhost:0.0
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+USER root
+
+# configure debian and terminal for non-interactive installation
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+RUN dpkg-divert --local --rename --add /sbin/initctl
+RUN ln -sf /bin/true /sbin/initctl
+RUN echo -e '#!/bin/sh\nexit 0' > /usr/sbin/policy-rc.d
+
+# create directories for requirements, third-party notices, license files and source
+RUN mkdir -p /third-party
+RUN chmod 777 /third-party
+
+# debian packages to install in this image
+COPY dpkg-requirements.txt /third-party/
+RUN apt-get update -q
+RUN grep -v '^\s*#' /third-party/dpkg-requirements.txt \
+    | xargs apt-get install --no-install-recommends -y -q
+RUN dpkg-query -f '${source:Package}=${source:Version}\n' -W | sort -u > /third-party/dpkg-lock.txt
+
+# packages used to configure this image that should be removed from the sanitized image
+# read dpkg-install-requirements.txt and omit comments
+COPY dpkg-install-requirements.txt /third-party/
+RUN grep -v '^\s*#' /third-party/dpkg-install-requirements.txt \
+    | xargs apt-get install --no-install-recommends -y -q
+
+# non-root container user
+RUN if ! id -u ${CONTAINER_USER} &>/dev/null; \
+	then useradd \
+		--uid ${CONTAINER_USER_UID} \
+		--user-group \
+        --create-home \
+		${CONTAINER_USER}; \
+    fi
+USER ${CONTAINER_USER}
+WORKDIR /home/${CONTAINER_USER}
+
+# create python virtual environment
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+RUN python3 -m venv .venv
+
+# pip requirements to install in this image
+COPY --chmod=644 pip-requirements.txt /third-party/
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && pip3 install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        --no-input \
+        --progress-bar=off \
+        -r /third-party/pip-requirements.txt
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && pip3 freeze -r /third-party/pip-requirements.txt --local > /third-party/pip-lock.txt
+
+
+###################
+# third-party stage
+###################
+FROM dependencies AS third-party
+ARG BUILDKIT_SBOM_SCAN_STAGE=false
+
+ARG CONTAINER_USER=ubuntu
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=localhost:0.0
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+USER root
+WORKDIR /third-party
+
+# add debian sources
+RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+        sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources; \
+    elif grep -q '^# deb-src' /etc/apt/sources.list; then \
+        sed -i '/^# deb-src/s/^# //' /etc/apt/sources.list; \
+    else \
+        echo "Error: Unsupported base image for enabling deb-src" >&2; \
+        exit 1; \
+    fi
+RUN apt-get update -q
+
+USER ${CONTAINER_USER}
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && pip3 install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        --no-input \
+        --progress-bar=off \
+    pip-licenses==5.0.0
+
+# link user's python site-packages to third-party source folder
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && ln -s "${VIRTUAL_ENV}/lib/python3.1*/site-packages" /third-party/pip-source
+
+# create license files and download source for pip and dpkg packages
+COPY --chmod=755 third-party-package.sh /third-party/
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && ./third-party-package.sh \
+        --dpkg dpkg-lock.txt \
+        --pip pip-lock.txt \
+        --output /third-party
+RUN rm /third-party/third-party-package.sh
+RUN rm /third-party/dpkg-install-requirements.txt
+
+
+###################
+# sanitized stage
+###################
+FROM dependencies AS sanitized
+ARG BUILDKIT_SBOM_SCAN_STAGE=false
+
+ARG CONTAINER_USER=ubuntu
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=localhost:0.0
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# system package cleanup
+USER root
+RUN grep -v '^\s*#' /third-party/dpkg-install-requirements.txt \
+    | xargs apt-get remove --purge --auto-remove -y -q
+RUN apt-get autoremove -y -q
+RUN apt-get clean -y -q
+RUN rm -rf /var/lib/apt/lists/*
+RUN rm -rf /third-party
+
+# python venv cleanup
+USER ${CONTAINER_USER}
+WORKDIR /home/${CONTAINER_USER}
+RUN source /home/${CONTAINER_USER}/.venv/bin/activate \
+    && pip cache purge
+RUN rm -rf /home/{CONTAINER_USER}/.venv/bin/__pycache__
+
+###################
+# base stage
+###################
+FROM ${BASEIMAGE} AS base
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+
+COPY --from=sanitized / /
+COPY --from=third-party --chmod=755 /third-party /third-party
+
+ARG CONTAINER_USER=ubuntu
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=localhost:0.0
+ENV PATH=/home/${CONTAINER_USER}/.local/bin:${PATH}
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+USER ${CONTAINER_USER}
+ENV VIRTUAL_ENV=/home/${CONTAINER_USER}/.venv
+ENV PATH=/home/${CONTAINER_USER}/.venv/bin:${PATH}
+WORKDIR /home/${CONTAINER_USER}
+
+# link third-party directory to home directory
+RUN ln -s /third-party /home/${CONTAINER_USER}/
+
+ENTRYPOINT ["source", "/home/${CONTAINER_USER}/.venv/bin/activate"]
