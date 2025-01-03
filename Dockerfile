@@ -31,18 +31,26 @@ ENV PATH=/home/${CONTAINER_USER}/.local/bin:${PATH}
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# SSH forwarding agent - map ssh agent socket to ~/.ssh/host-agent.sock
+# in the container to use your agent with the container user
+USER root
+RUN echo "${CONTAINER_USER} ALL=(root) NOPASSWD:/usr/bin/socat *" | sudo tee /etc/sudoers.d/${CONTAINER_USER}
+RUN chmod 0440 /etc/sudoers.d/${CONTAINER_USER}
+
 USER ${CONTAINER_USER}
 ENV VIRTUAL_ENV=/home/${CONTAINER_USER}/.venv
 ENV PATH=/home/${CONTAINER_USER}/.venv/bin:${PATH}
 WORKDIR /home/${CONTAINER_USER}
 
-# copy ansible configuration
+# ansible configuration
 COPY --chown=${CONTAINER_USER}:${CONTAINER_USER} ansible.cfg /home/${CONTAINER_USER}/ansible.cfg
+RUN mkdir -p /home/${CONTAINER_USER}/.ansible
 
 # configure SSH
 RUN mkdir -p /home/${CONTAINER_USER}/.ssh
 RUN chmod 700 /home/${CONTAINER_USER}/.ssh
 COPY --chown=${CONTAINER_USER}:${CONTAINER_USER} --chmod=600 ssh.config /home/${CONTAINER_USER}/.ssh/config
 
-# entrypoint ensure venv is activated and have bash pass remaining arguments to ansible-playbook
-ENTRYPOINT ["/bin/bash", "-c", "source /home/${CONTAINER_USER}/.venv/bin/activate && ansible-playbook \"$@\"", "--"]
+# run entrypoint script and pass any arguments to it
+COPY --chmod=755 environment.sh /
+ENTRYPOINT ["/bin/bash", "-c", "source /environment.sh && ansible-playbook \"$@\"", "--"]

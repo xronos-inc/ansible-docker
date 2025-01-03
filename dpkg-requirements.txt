@@ -1,6 +1,8 @@
 ca-certificates=20240203
 openssl=3.0.13-0ubuntu3.4
 openssh-client=1:9.6p1-3ubuntu13.5
+sudo=1.9.15p5-3ubuntu5
+socat=1.8.0.0-4build3
 sshpass=1.09-1
 python3-minimal=3.12.3-0ubuntu2
 rsync=3.2.7-1ubuntu1
