@@ -165,6 +165,7 @@ COPY --from=sanitized / /
 COPY --from=third-party --chmod=755 /third-party /third-party
 
 ARG CONTAINER_USER=ubuntu
+ENV CONTAINER_USER=${CONTAINER_USER}
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=localhost:0.0
@@ -180,4 +181,5 @@ WORKDIR /home/${CONTAINER_USER}
 # link third-party directory to home directory
 RUN ln -s /third-party /home/${CONTAINER_USER}/
 
-ENTRYPOINT ["source", "/home/${CONTAINER_USER}/.venv/bin/activate"]
+# entrypoint is a bash shell, passing any user-provided arguments to the bash command
+ENTRYPOINT ["/bin/bash", "-c", "source /home/${CONTAINER_USER}/.venv/bin/activate exec bash \"$@\"", "--"]

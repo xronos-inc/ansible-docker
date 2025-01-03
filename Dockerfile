@@ -23,6 +23,7 @@ LABEL org.opencontainers.image.source="https://github.com/xronos-inc/ansible-doc
 COPY --from=base / /
 
 ARG CONTAINER_USER=ubuntu
+ENV CONTAINER_USER=${CONTAINER_USER}
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=localhost:0.0
@@ -43,4 +44,5 @@ RUN mkdir -p /home/${CONTAINER_USER}/.ssh
 RUN chmod 700 /home/${CONTAINER_USER}/.ssh
 COPY --chown=${CONTAINER_USER}:${CONTAINER_USER} --chmod=600 ssh.config /home/${CONTAINER_USER}/.ssh/config
 
-ENTRYPOINT ["source", "/home/${CONTAINER_USER}/.venv/bin/activate", "&&", "ansible-playbook"]
+# entrypoint ensure venv is activated and have bash pass remaining arguments to ansible-playbook
+ENTRYPOINT ["/bin/bash", "-c", "source /home/${CONTAINER_USER}/.venv/bin/activate && ansible-playbook \"$@\"", "--"]
