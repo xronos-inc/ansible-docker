@@ -43,7 +43,7 @@ ENV PATH=/home/${CONTAINER_USER}/.venv/bin:${PATH}
 WORKDIR /home/${CONTAINER_USER}
 
 # ansible configuration
-COPY --chown=${CONTAINER_USER}:${CONTAINER_USER} ansible.cfg /home/${CONTAINER_USER}/ansible.cfg
+COPY --chown=${CONTAINER_USER}:${CONTAINER_USER} ansible.cfg /home/${CONTAINER_USER}/.ansible.cfg
 RUN mkdir -p /home/${CONTAINER_USER}/.ansible
 
 # configure SSH
