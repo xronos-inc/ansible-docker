@@ -10,8 +10,8 @@ platform=linux/amd64,linux/arm64
 docker build . \
     -f Dockerfile.base \
     --target=base \
-    --sbom=true \
-    --provenance=true \
+    --sbom=false \
+    --provenance=false \
     --platform=${platform} \
     --tag base
 docker build . \

@@ -6,4 +6,5 @@ socat=1.8.0.0-4build3
 sshpass=1.09-1
 python3-minimal=3.12.3-0ubuntu2
 rsync=3.2.7-1ubuntu1
-git=1:2.43.0-1ubuntu7.1
+util-linux=2.39.3-9ubuntu6.2
+git=1:2.43.0-1ubuntu7.2
