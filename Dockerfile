@@ -5,6 +5,7 @@
 
 ARG BASEIMAGE=ubuntu:noble-20241118.1
 ARG BUILDKIT_SBOM_SCAN_CONTEXT=false
+ARG BUILDKIT_SBOM_SCAN_STAGE=false
 
 ###################
 # application stage
